@@ -39,8 +39,10 @@ def generateAdjMatrix(mu: List[float], seed: Optional[int] = None) -> List[List[
 
 
 if __name__ == "__main__":
-    testData = generateTestData(10, 1)
-    adj = generateAdjMatrix(testData, 1)
+    seed = 100
+    count = 10
+    testData = generateTestData(count, seed)
+    adj = generateAdjMatrix(testData, seed)
     print("-"*5 + " Test Data " + "-"*5)
     print(*testData)
     print("-"*5 + " Ranking " + "-"*5)
@@ -49,5 +51,5 @@ if __name__ == "__main__":
     for row in adj:
         print(' '.join(map(str, row)))
 
-
+    print(adj)
 
