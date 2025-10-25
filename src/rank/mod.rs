@@ -1,6 +1,9 @@
 use ndarray::{Array1, Array2, array};
-use scirs2_optimize::unconstrained::{Method, Options, minimize};
+use scirs2_optimize::unconstrained::{Method, minimize};
 use scirs2_stats::distributions;
+use std::error::Error;
+
+// Put this all in a struct
 
 fn big_phi(x: f64, normal: &distributions::Normal<f64>) -> f64 {
     normal.cdf(x)
@@ -33,35 +36,45 @@ fn cost_function(
     -cost
 }
 
-fn calc_expected_means(data: &Array2<i32>) -> Array1<f64> {
+fn calc_expected_means(
+    data: &Array2<i32>,
+    prev_means: Option<Vec<f64>>,
+) -> Result<Array1<f64>, Box<dyn Error>> {
     if data.is_empty() {
-        return array![];
+        return Ok(array![]);
     }
     let (n, cols) = data.dim();
-    assert!(n == cols); // Ensure it's a square matrix
-    let normal = distributions::Normal::new(0.0, 1.0).unwrap();
-    //let mut means: Array1<f64> = Array1::zeros(n);
-    let x0 = vec![0.0; n]; // initial guess
-
-    let opts = Options::default();
+    if n != cols {
+        return Err("non-square matrix".into());
+    }
+    let normal = distributions::Normal::new(0.0, 1.0)?;
+    let x0 = match prev_means {
+        Some(x) => {
+            if x.len() == n {
+                x
+            } else {
+                return Err("prev_means not of expected length".into());
+            }
+        }
+        None => vec![0.0; n],
+    };
 
     // Use BFGS method
     let result = minimize(
         |means| cost_function(data, &means.to_owned(), &normal),
         &x0,
         Method::BFGS,
-        Some(opts),
-    )
-    .expect("Optimization failed");
+        None,
+    )?;
 
-    result.x
+    Ok(result.x)
 }
 
-pub fn rank(data: &Array2<i32>) -> Vec<usize> {
-    let means = calc_expected_means(data);
+pub fn rank(data: &Array2<i32>) -> Result<Vec<usize>, Box<dyn Error>> {
+    let means = calc_expected_means(data, None)?;
     let mut indices: Vec<usize> = (0..means.len()).collect();
     indices.sort_by(|&i, &j| means[j].partial_cmp(&means[i]).unwrap());
-    indices
+    Ok(indices)
 }
 
 #[cfg(test)]
@@ -83,6 +96,6 @@ mod tests {
             [20, 15, 0, 0, 0, 12, 0, 7, 20, 0]
         ];
 
-        assert_eq!(rank(&data), vec![6, 2, 4, 3, 7, 9, 5, 1, 0, 8]);
+        assert_eq!(rank(&data).unwrap(), vec![6, 2, 4, 3, 7, 9, 5, 1, 0, 8]);
     }
 }
